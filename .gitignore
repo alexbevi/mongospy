@@ -1,5 +1,6 @@
 # Binaries
-/mongospy
+mongospy
+mongospy.yaml
 *.exe
 *.exe~
 *.dll

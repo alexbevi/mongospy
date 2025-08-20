@@ -24,9 +24,11 @@ func RunSampler(cfg *Config, out chan<- map[string]float64, hostCh chan<- string
 	go func() {
 		prev := make(map[string]float64)
 		tickSeconds := tick.Seconds()
-		for {
-			select {
-			case <-time.After(tick):
+		ticker := time.NewTicker(tick)
+		defer ticker.Stop()
+		prev = make(map[string]float64)
+		tickSeconds = tick.Seconds()
+		for range ticker.C {
 				var result bson.M
 				if err := db.RunCommand(ctx, bson.D{{Key: "serverStatus", Value: 1}}).Decode(&result); err != nil {
 					continue
@@ -68,7 +70,6 @@ func RunSampler(cfg *Config, out chan<- map[string]float64, hostCh chan<- string
 					}
 				}
 				out <- values
-			}
 		}
 	}()
 
