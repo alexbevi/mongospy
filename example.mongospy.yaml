@@ -7,6 +7,10 @@ metrics:
     type: "counter"
     derive: "rate_per_sec"
     color: "2"
+    # Compare bytesIn to the zlibIn counter. The TUI will show the absolute
+    # difference and percentage (bytesIn vs zlibIn) along with elapsed time
+    # since the UI started collecting samples.
+    compare: "zlibIn"
   - name: "bytesOut"
     path: "network.bytesOut"
     type: "counter"
@@ -18,7 +22,7 @@ metrics:
     derive: "rate_per_sec"
     color: "4"
   - name: "zlibOut"
-    path: "network.compression.zlib.decompressor.bytesOut"
+    path: "network.compression.zlib.compressor.bytesOut"
     type: "counter"
     derive: "rate_per_sec"
     color: "5"
