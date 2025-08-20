@@ -3,22 +3,18 @@
 `mongospy` is a cross-platform terminal UI (TUI) tool for visualizing MongoDB [`serverStatus`](https://www.mongodb.com/docs/manual/reference/command/serverStatus/) metrics in real time.
 It connects to a MongoDB instance, extracts configured fields, and charts them as time series graphs directly in your terminal.
 
----
-
 ## Features
 
-- � Live time-series charts in your terminal
-- � Connects directly via MongoDB Go driver (or via stdin for testing)
-- ⚙️ Configurable metrics with dot-paths into `serverStatus`
-- � Counter → per-second rate computation (bytes/s, ops/s, etc.)
-- � Handles counter resets (e.g., server restarts)
-- �️ Works on Linux, macOS, and Windows
-- � Single static binary (no dependencies)
- - 📊 One chart per metric: each row shows the metric name/value on the left and a small chart of recent changes on the right
- - 🔢 Values shown are deltas between samples (or rates when `derive: rate_per_sec` is configured)
- - 🏷️ TUI title updates to include the `serverStatus.host` value for the connected server
-
----
+- Live time-series charts in your terminal
+- Connects directly via MongoDB Go driver (or via stdin for testing)
+- Configurable metrics with dot-paths into `serverStatus`
+- Counter → per-second rate computation (bytes/s, ops/s, etc.)
+- Handles counter resets (e.g., server restarts)
+- Works on Linux, macOS, and Windows
+- Single static binary (no dependencies)
+- One chart per metric: each row shows the metric name/value on the left and a small chart of recent changes on the right
+- Values shown are deltas between samples (or rates when `derive: rate_per_sec` is configured)
+- TUI title updates to include the `serverStatus.host` value for the connected server
 
 ## Installation
 
@@ -31,8 +27,6 @@ git clone https://github.com/alexbevi/mongospy.git
 cd mongospy
 go build -o mongospy
 ````
-
----
 
 ## Usage
 
@@ -47,7 +41,6 @@ Quick start with flags:
 ```bash
 ./mongospy \
   --uri mongodb://localhost:27017 \
-  --paths network.bytesIn,network.bytesOut \
   --interval 2s --window 5m
 ```
 
@@ -56,10 +49,8 @@ Testing via `mongosh` output:
 ```bash
 mongosh "mongodb://localhost" --quiet \
   --eval "JSON.stringify(db.getSiblingDB('admin').serverStatus())" \
-| ./mongospy --source stdin --paths network.bytesIn,network.bytesOut
+| ./mongospy --source stdin
 ```
-
----
 
 ## Configuration
 
@@ -100,8 +91,6 @@ metrics:
 * **`derive`**: `none`, `rate_per_sec`, or `delta`
 * **`color`**: Numeric or named color supported by the TUI
 
----
-
 ## Keyboard Shortcuts
 
 * `q` → Quit
@@ -109,41 +98,6 @@ metrics:
 * `e` → Export buffer to CSV/JSON (planned)
 * `1..9` → Toggle metric visibility
 * `TAB` → Cycle chart layouts
-
----
-
-## Example
-
-Tracking network traffic:
-
-```
-bytesIn    ──────────╮
-bytesOut   ╮─────────╯
-snappyIn       ╭─────
-snappyOut      ╯
-```
-
-Legend shows the latest values (e.g. `bytesIn: 12.3 MB/s`).
-
----
-
-## Roadmap
-
-* [ ] Export collected data as CSV/JSON
-* [ ] Multiple chart panels (per subsystem)
-* [ ] Derived metrics (e.g., compression savings)
-* [ ] Threshold alerts with color flips
-* [ ] Replay mode from saved JSONL
-
----
-
-## Requirements & Permissions
-
-* Needs a user with `serverStatus` privilege on the `admin` database
-* Works against standalone, replica set, and sharded cluster nodes
-* For cluster-wide stats, run separately against each node
-
----
 
 ## License
 
