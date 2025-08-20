@@ -44,14 +44,6 @@ Quick start with flags:
   --interval 2s --window 5m
 ```
 
-Testing via `mongosh` output:
-
-```bash
-mongosh "mongodb://localhost" --quiet \
-  --eval "JSON.stringify(db.getSiblingDB('admin').serverStatus())" \
-| ./mongospy --source stdin
-```
-
 ## Configuration
 
 `mongospy` is configured using a YAML file. Example:
@@ -90,6 +82,47 @@ metrics:
 * **`type`**: `counter` (monotonically increasing) or `gauge` (instantaneous)
 * **`derive`**: `none`, `rate_per_sec`, or `delta`
 * **`color`**: Numeric or named color supported by the TUI
+
+## Comparisons
+
+You can compare two counters in the UI by adding a `compare` field to a metric
+and referencing another metric by `name`. When present, the TUI will compute
+running cumulative totals for both metrics and show a compact comparison in the
+left-hand legend for the metric.
+
+Example (compare `bytesIn` to `zlibIn`):
+
+```yaml
+- name: "bytesIn"
+  path: "network.bytesIn"
+  type: "counter"
+  derive: "rate_per_sec"
+  color: "2"
+  compare: "zlibIn"
+
+- name: "zlibIn"
+  path: "network.compression.zlib.compressor.bytesIn"
+  type: "counter"
+  derive: "rate_per_sec"
+  color: "4"
+```
+
+Display example in the legend:
+
+```
+bytesIn
+1.02 MB
+vs zlibIn: 1.02 MB / 21.86 MB (4.46%) since 1m2s
+```
+
+Notes:
+- The percentage shown is this metric's share of the combined cumulative total
+  (cumA / (cumA + cumB) * 100), which keeps the value bounded and easy to
+  interpret.
+- Cumulative totals are calculated in the UI from the sampled values; if a
+  metric uses `derive: rate_per_sec` the sampled rate is converted back to a
+  per-sample increment using the sampling interval before adding to the
+  cumulative total.
 
 ## Keyboard Shortcuts
 

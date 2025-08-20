@@ -12,6 +12,10 @@ type MetricConfig struct {
 	Type   string `yaml:"type"`   // counter | gauge
 	Derive string `yaml:"derive"` // none | rate_per_sec | delta
 	Color  string `yaml:"color"`
+	// Compare optionally names another metric (by Name) to compare against.
+	// If set, the UI will show the absolute delta and percentage between
+	// this metric and the named metric.
+	Compare string `yaml:"compare,omitempty"`
 }
 
 type Config struct {

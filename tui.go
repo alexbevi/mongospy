@@ -106,11 +106,23 @@ func RunTUI(ctx context.Context, metricCh <-chan map[string]float64, cfg *Config
 		series := make(map[string][]float64)
 		// timestamps aligned with samples
 		timestamps := make([]time.Time, 0, 200)
+		var startTime time.Time
+		// cumulative totals per metric (running total since UI started)
+		cumValues := make(map[string]float64)
 		for vals := range metricCh {
 			// append timestamp
 			timestamps = append(timestamps, time.Now())
+			if startTime.IsZero() {
+				startTime = time.Now()
+			}
 			if len(timestamps) > 200 {
 				timestamps = timestamps[1:]
+			}
+
+			// compute intervalSeconds based on last two timestamps when possible
+			intervalSeconds := 0.0
+			if len(timestamps) >= 2 {
+				intervalSeconds = timestamps[len(timestamps)-1].Sub(timestamps[len(timestamps)-2]).Seconds()
 			}
 
 			for i, m := range cfg.Metrics {
@@ -118,6 +130,15 @@ func RunTUI(ctx context.Context, metricCh <-chan map[string]float64, cfg *Config
 				if len(series[m.Name]) > 200 {
 					series[m.Name] = series[m.Name][1:]
 				}
+
+				// update cumulative value for this metric using per-sample value
+				// If metric is a per-second rate, convert back to per-sample by multiplying by intervalSeconds.
+				perSample := vals[m.Name]
+				if m.Derive == "rate_per_sec" && intervalSeconds > 0 {
+					perSample = vals[m.Name] * intervalSeconds
+				}
+				// For gauges or when interval is unknown, treat perSample as the emitted value.
+				cumValues[m.Name] += perSample
 
 				// metric color is stored as a string in the config; try to parse
 				colorInt := int(cell.ColorWhite)
@@ -154,6 +175,27 @@ func RunTUI(ctx context.Context, metricCh <-chan map[string]float64, cfg *Config
 				// update left text widget for this metric (name + formatted latest)
 				latest := series[m.Name][len(series[m.Name])-1]
 				legend := m.Name + "\n" + formatValue(m, latest) + "\n"
+				// if this metric compares to another, display the running total delta and percentage
+				if m.Compare != "" {
+					if _, ok := series[m.Compare]; ok {
+						// cumulative values for this metric and the compared metric
+						cumA := cumValues[m.Name]
+						cumB := cumValues[m.Compare]
+						pctStr := "N/A"
+						total := cumA + cumB
+						if total != 0 {
+							// show this metric's share of the combined total (bounded 0-100%)
+							pct := (cumA / total) * 100.0
+							pctStr = fmt.Sprintf("%.2f%%", pct)
+						}
+						// show cumulative totals for both metrics (formatted consistently)
+						left := formatCumulative(m, cumA)
+						right := formatCumulative(m, cumB)
+						elapsed := time.Since(startTime)
+						legend += fmt.Sprintf("vs %s: %s / %s (%s) since %s\n", m.Compare, left, right, pctStr, formatDuration(elapsed))
+					}
+				}
+
 				_ = texts[i].Write(legend, text.WriteReplace())
 			}
 		}
@@ -207,6 +249,30 @@ func formatValue(m MetricConfig, v float64) string {
 	return s
 }
 
+// formatCumulative formats a cumulative total for display in comparisons.
+// It uses the same byte detection heuristics as formatValue but does not
+// append "/s" even if the metric has Derive == "rate_per_sec".
+func formatCumulative(m MetricConfig, v float64) string {
+	isBytes := false
+	if m.Path != "" {
+		p := strings.ToLower(m.Path)
+		if strings.Contains(p, "byte") || strings.Contains(p, "bytes") {
+			isBytes = true
+		}
+	}
+	if !isBytes {
+		n := strings.ToLower(m.Name)
+		if strings.Contains(n, "byte") || strings.Contains(n, "bytes") {
+			isBytes = true
+		}
+	}
+
+	if isBytes {
+		return humanBytes(v)
+	}
+	return fmt.Sprintf("%.2f", v)
+}
+
 // humanBytes formats a float64 number of bytes into a human readable string.
 func humanBytes(b float64) string {
 	if math.IsNaN(b) || math.IsInf(b, 0) {
@@ -222,4 +288,24 @@ func humanBytes(b float64) string {
 		val /= 1024.0
 	}
 	return fmt.Sprintf("%.2f %s", val, units[i])
+}
+
+// formatDuration returns a concise human readable duration like "1h2m3s".
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return d.String()
+	}
+	// drop fractional seconds
+	secs := int64(d.Seconds())
+	h := secs / 3600
+	secs %= 3600
+	m := secs / 60
+	s := secs % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh%dm%ds", h, m, s)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm%ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
 }
