@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func RunSampler(cfg *Config, out chan<- map[string]float64) error {
+func RunSampler(cfg *Config, out chan<- map[string]float64, hostCh chan<- string) error {
 	ctx := context.Background()
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.URI))
 	if err != nil {
@@ -22,6 +22,8 @@ func RunSampler(cfg *Config, out chan<- map[string]float64) error {
 	tick, _ := time.ParseDuration(cfg.RefreshInterval)
 
 	go func() {
+		prev := make(map[string]float64)
+		tickSeconds := tick.Seconds()
 		for {
 			select {
 			case <-time.After(tick):
@@ -30,10 +32,39 @@ func RunSampler(cfg *Config, out chan<- map[string]float64) error {
 					continue
 				}
 
+				// extract host field if present
+				if host, ok := result["host"].(string); ok {
+					select {
+					case hostCh <- host:
+					default:
+					}
+				}
+
 				values := map[string]float64{}
 				for _, m := range cfg.Metrics {
-					if v, ok := resolvePath(result, m.Path); ok {
-						values[m.Name] = v
+					if cur, ok := resolvePath(result, m.Path); ok {
+						// if metric is a counter (or derive requests deltas), compute delta
+						if m.Type == "counter" || m.Derive == "delta" || m.Derive == "rate_per_sec" {
+							if prevV, ok := prev[m.Name]; ok {
+								delta := cur - prevV
+								if delta < 0 {
+									// counter reset detected; treat as cur value
+									delta = cur
+								}
+								if m.Derive == "rate_per_sec" {
+									values[m.Name] = delta / tickSeconds
+								} else {
+									values[m.Name] = delta
+								}
+							} else {
+								// no previous sample; emit 0
+								values[m.Name] = 0
+							}
+						} else {
+							// gauges and others: pass current value
+							values[m.Name] = cur
+						}
+						prev[m.Name] = cur
 					}
 				}
 				out <- values

@@ -14,6 +14,9 @@ It connects to a MongoDB instance, extracts configured fields, and charts them a
 - � Handles counter resets (e.g., server restarts)
 - �️ Works on Linux, macOS, and Windows
 - � Single static binary (no dependencies)
+ - 📊 One chart per metric: each row shows the metric name/value on the left and a small chart of recent changes on the right
+ - 🔢 Values shown are deltas between samples (or rates when `derive: rate_per_sec` is configured)
+ - 🏷️ TUI title updates to include the `serverStatus.host` value for the connected server
 
 ---
 

@@ -16,14 +16,15 @@ func main() {
 	}
 
 	metricCh := make(chan map[string]float64, 1)
-	if err := RunSampler(cfg, metricCh); err != nil {
+	hostCh := make(chan string, 1)
+	if err := RunSampler(cfg, metricCh, hostCh); err != nil {
 		log.Fatal(err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := RunTUI(ctx, metricCh, cfg); err != nil {
+	if err := RunTUI(ctx, metricCh, cfg, hostCh); err != nil {
 		log.Fatal(err)
 	}
 }
